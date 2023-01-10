@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<CONFIG>
+  <Package Version="5">
+    <Name Value="libvorbis_ilya2ik"/>
+    <Type Value="RunAndDesignTime"/>
+    <Author Value="Ilya Medvedkov"/>
+    <CompilerOptions>
+      <Version Value="11"/>
+      <SearchPaths>
+        <UnitOutputDirectory Value="lib/$(TargetCPU)-$(TargetOS)"/>
+      </SearchPaths>
+    </CompilerOptions>
+    <Description Value="Free pascal wrapper around Vorbis library"/>
+    <License Value="LGPL v3.0"/>
+    <Version Minor="7"/>
+    <Files>
+      <Item>
+        <Filename Value="libvorbis_dyn.pas"/>
+        <UnitName Value="libVorbis_dyn"/>
+      </Item>
+      <Item>
+        <Filename Value="oglvorbiswrapper.pas"/>
+        <UnitName Value="OGLVorbisWrapper"/>
+      </Item>
+    </Files>
+    <RequiredPkgs>
+      <Item>
+        <PackageName Value="libogg_ilya2ik"/>
+      </Item>
+      <Item>
+        <PackageName Value="FCL"/>
+      </Item>
+    </RequiredPkgs>
+    <UsageOptions>
+      <UnitPath Value="$(PkgOutDir)"/>
+    </UsageOptions>
+    <PublishOptions>
+      <Version Value="2"/>
+      <UseFileFilters Value="True"/>
+    </PublishOptions>
+  </Package>
+</CONFIG>
