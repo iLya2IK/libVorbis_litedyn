@@ -9,7 +9,7 @@
         <MainUnitHasScaledStatement Value="False"/>
       </Flags>
       <SessionStorage Value="InProjectDir"/>
-      <Title Value="vorbisstreaming"/>
+      <Title Value="oggvorbis"/>
       <UseAppBundle Value="False"/>
       <ResourceType Value="res"/>
     </General>
@@ -19,7 +19,7 @@
         <CompilerOptions>
           <Version Value="11"/>
           <Target>
-            <Filename Value="vorbisstreaming"/>
+            <Filename Value="oggvorbis"/>
           </Target>
           <SearchPaths>
             <IncludeFiles Value="$(ProjOutDir)"/>
@@ -53,7 +53,7 @@
         <CompilerOptions>
           <Version Value="11"/>
           <Target>
-            <Filename Value="vorbisstreaming"/>
+            <Filename Value="oggvorbis"/>
           </Target>
           <SearchPaths>
             <IncludeFiles Value="$(ProjOutDir)"/>
@@ -91,7 +91,7 @@
     </RequiredPackages>
     <Units>
       <Unit>
-        <Filename Value="vorbisstreaming.lpr"/>
+        <Filename Value="oggvorbis.lpr"/>
         <IsPartOfProject Value="True"/>
       </Unit>
     </Units>
@@ -99,7 +99,7 @@
   <CompilerOptions>
     <Version Value="11"/>
     <Target>
-      <Filename Value="vorbisstreaming"/>
+      <Filename Value="oggvorbis"/>
     </Target>
     <SearchPaths>
       <IncludeFiles Value="$(ProjOutDir)"/>

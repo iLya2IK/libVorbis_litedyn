@@ -113,7 +113,7 @@ begin
     end;
   end;
 
-  Result := FStream.SaveToFile(Fn, oemVBR, channels, Frequency, 128, bits, 0.5, nil);
+  Result := FStream.SaveToFile(Fn, oemVBR, channels, Frequency, 128000, bits, 0.5, nil);
 end;
 
 function TOALVorbisDataRecorder.SaveToStream(Str : TStream) : Boolean;

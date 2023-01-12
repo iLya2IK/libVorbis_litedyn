@@ -650,7 +650,7 @@ begin
   if aMode = oemCBR then
   begin
     fRef^.enc := TVorbis.NewEncoderABR(fRef^.info, aChannels,
-                                            aFreq, -1, aBitrate * 1000, -1);
+                                            aFreq, -1, aBitrate, -1);
   end;
   fRef^.block := Encoder.InitBlock;
   fRef^.bitdepth := aBitdepth;
