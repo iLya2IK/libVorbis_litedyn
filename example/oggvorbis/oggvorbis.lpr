@@ -1,3 +1,17 @@
+{
+   OggVorbis example - part of libVorbis_dyn
+
+   Copyright 2023 Ilya Medvedkov
+
+   In this example, pcm audio data is recorded by OpenAL, encoded and saved
+   to a file in vorbis-ogg format in streaming mode.
+   Then the saved file is opened, audio data is read and decoded, then played
+   by OpenAL with buffering.
+
+   Additionally required the OpenAL_soft library:
+      https://github.com/iLya2IK/libOpenALsoft_dyn
+}
+
 program vorbisstreaming;
 
 uses
@@ -9,7 +23,10 @@ uses
 
 type
 
-{ TOALVorbisDataRecorder }
+  { TOALStreamDataRecorder, TOALStreamDataSource child classes
+  to implement vorbis-Ogg data encoding/decoding in streaming mode }
+
+  { TOALVorbisDataRecorder }
 
   TOALVorbisDataRecorder = class(TOALStreamDataRecorder)
   private
@@ -113,7 +130,8 @@ begin
     end;
   end;
 
-  Result := FStream.SaveToFile(Fn, oemVBR, channels, Frequency, 128000, bits, 0.5, nil);
+  Result := FStream.SaveToFile(Fn, oemVBR, channels, Frequency,
+                                           128000, bits, 0.5, nil);
 end;
 
 function TOALVorbisDataRecorder.SaveToStream(Str : TStream) : Boolean;
@@ -133,7 +151,8 @@ begin
   Result := FStream.WriteSamples(Buffer, Count, nil);
 end;
 
-const cCaptureFile = 'capture.ogg';
+const // name of file to capture data
+      cCaptureFile = 'capture.ogg';
       {$ifdef Windows}
       cOALDLL = '..\libs\soft_oal.dll';
       cOGGDLL = '..\libs\ogg.dll';
@@ -143,35 +162,45 @@ const cCaptureFile = 'capture.ogg';
       {$endif}
 
 var
-  OALCapture : TOALCapture;
-  OALPlayer  : TOALPlayer;
+  OALCapture : TOALCapture; // OpenAL audio recoder
+  OALPlayer  : TOALPlayer;  // OpenAL audio player
   dt: Integer;
 begin
+  // Open vorbis, Ogg, OpenAL libraries and initialize interfaces
   {$ifdef Windows}
   if TOpenAL.OALLibsLoad([cOALDLL]) and
-     TOGG.OGGLibsLoad([cOGGDLL]) and
+     TOGG.OGGLibsLoad([cOGGDLL]) and // nb: vorbis encoder should use
+                                     //     ogg library
      TVorbis.VorbisLibsLoad(cVorbisDLL) then
   {$else}
   if TOpenAL.OALLibsLoadDefault and
      TOGG.OGGLibsLoadDefault and TVorbis.VorbisLibsLoadDefault then
   {$endif}
   begin
+    // create OpenAL audio recoder
     OALCapture := TOALCapture.Create;
     try
       try
+        // config OpenAL audio recoder
         OALCapture.DataRecClass := TOALVorbisDataRecorder;
+        // initialize OpenAL audio recoder
         OALCapture.Init;
+        // configure buffering for the audio recorder to save data to a file
         if OALCapture.SaveToFile(cCaptureFile) then
         begin
+          // start to record data with OpanAL
           OALCapture.Start;
 
+          // run recording loop
           dt := 0;
           while dt < 1000 do begin
+            // capture new data chunk and encode/write with vorbisenc to
+            // cCaptureFile in vorbis-ogg format
             OALCapture.Proceed;
             TThread.Sleep(10);
             inc(dt);
           end;
-
+          //stop recording. close vorbis-ogg file cCaptureFile
           OALCapture.Stop;
 
           WriteLn('Capturing completed successfully!');
@@ -186,17 +215,24 @@ begin
       OALCapture.Free;
     end;
 
+    // create OpenAL audio player
     OALPlayer := TOALPlayer.Create;
     try
       try
+        // config OpenAL audio player
         OALPlayer.DataSourceClass := TOALVorbisDataSource;
+        // initialize OpenAL audio player
         OALPlayer.Init;
+        // configure buffering for the audio player to read data from file
         if OALPlayer.LoadFromFile(cCaptureFile) then
         begin
-
+          // start to play audio data with OpanAL
           OALPlayer.Play;
 
+          // run playing loop. do while the data is available
           while OALPlayer.Status = oalsPlaying do begin
+            // if there are empty buffers available - read/decode new data chunk
+            // from cCaptureFile with vorbisfile and put them in the queue
             OALPlayer.Stream.Proceed;
             TThread.Sleep(10);
           end;
@@ -213,11 +249,11 @@ begin
       OALPlayer.Free;
     end;
 
+    // close interfaces
     TOpenAL.OALLibsUnLoad;
     TVorbis.VorbisLibsUnLoad;
     TOGG.OGGLibsUnLoad;
   end else
     WriteLn('Cant load libraries');
-  ReadLn;
 end.
 

@@ -11,9 +11,10 @@
 */*/backup/
 /lib/
 /backup/
-/examples/*/*
-!/examples/*/*.lpr
-!/examples/*/*.lpi
+/example/*/*
+!/example/*/*.lpr
+!/example/*/*.lpi
+!/example/media/testing.ogg
 *.key
 *.crt
 *.dbg
