@@ -16,7 +16,9 @@ unit OGLVorbisWrapper;
 interface
 
 uses
-  Classes, SysUtils, libVorbis_dyn, OGLOGGWrapper, ctypes;
+  Classes, SysUtils, libVorbis_dyn, OGLOGGWrapper,
+  OGLSoundUtils, OGLSoundUtilTypes, OGLSoundDataConverting,
+  ctypes;
 
 type
 
@@ -294,30 +296,27 @@ type
     block : IVorbisBlock;
     info  : IVorbisInfo;
     oggs  : IOGGStreamState;
-    bitdepth : Integer;
+    ssize : TSoundSampleSize;
     quality : Single;
-    mode : TOGGSoundEncoderMode;
+    mode : TSoundEncoderMode;
   end;
 
   { TVorbisOggEncoder }
 
-  TVorbisOggEncoder = class(TOGGSoundEncoder)
+  TVorbisOggEncoder = class(TSoundAbstractEncoder)
   private
     fRef : pOggVorbisEnc;
     fComm : IOGGComment;
   protected
-    procedure Init(aMode : TOGGSoundEncoderMode;
-                   aChannels : Cardinal;
-                   aFreq, aBitrate, aBitdepth : Cardinal;
-                   aQuality : Single;
-                   aComments : IOGGComment); override;
+    procedure Init(aProps : ISoundEncoderProps;
+                   aComments : ISoundComment); override;
     procedure Done; override;
 
-    function GetBitdepth : Cardinal; override;
+    function GetSampleSize : TSoundSampleSize; override;
     function GetBitrate : Cardinal; override;
     function GetChannels : Cardinal; override;
     function GetFrequency : Cardinal; override;
-    function GetMode : TOGGSoundEncoderMode; override;
+    function GetMode : TSoundEncoderMode; override;
     function GetQuality : Single; override;
     function GetVersion : Integer; override;
 
@@ -327,16 +326,13 @@ type
   public
     function Ref : pOggVorbisEnc; inline;
 
-    constructor Create(aMode : TOGGSoundEncoderMode; aChannels : Cardinal; aFreq,
-      aBitrate, aBitdepth : Cardinal; aQuality : Single; aComments : IOGGComment);
+    constructor Create(aProps : ISoundEncoderProps; aComments : IOGGComment);
     destructor Destroy; override;
 
     function  Comments : IOGGComment; override;
 
-    function  DataMode : TOGGSoundDataMode; override;
-
-    function  WriteData(Buffer : Pointer; Count : Integer;
-                               {%H-}Par : Pointer) : Integer; override;
+    function  WriteData(Buffer : Pointer; Count : ISoundFrameSize;
+                               {%H-}Par : Pointer) : ISoundFrameSize; override;
     procedure WriteHeader({%H-}Par : Pointer); override;
     procedure Close({%H-}Par : Pointer); override;
     procedure Flush({%H-}Par : Pointer); override;
@@ -347,14 +343,11 @@ type
   { TVorbisOggStreamingEncoder }
 
   TVorbisOggStreamingEncoder = class(TVorbisOggEncoder)
-  private
-    fStream : TStream;
   protected
     procedure FlushOggStream; override;
   public
-    constructor Create(aStream : TStream; aMode : TOGGSoundEncoderMode;
-      aChannels : Cardinal; aFreq, aBitrate, aBitdepth : Cardinal;
-      aQuality : Single; aComments : IOGGComment);
+    constructor Create(aStream : TStream; aProps : ISoundEncoderProps;
+                       aComments : IOGGComment);
     procedure SetStream(aStream : TStream);
     procedure ReInitEncoder;
   end;
@@ -368,12 +361,13 @@ type
 
   { TVorbisOggDecoder }
 
-  TVorbisOggDecoder = class(TOGGSoundDecoder)
+  TVorbisOggDecoder = class(TSoundAbstractDecoder)
   private
     fRef  : Pointer;
     fComm : IOGGComment;
 
-    function GetBitdepth : Cardinal; override;
+  protected
+    function GetSampleSize : TSoundSampleSize; override;
     function GetBitrate : Cardinal; override;
     function GetChannels : Cardinal; override;
     function GetFrequency : Cardinal; override;
@@ -401,10 +395,8 @@ type
   public
     function Ref : pOggVorbisFileDec; inline;
 
-    function  DataMode : TOGGSoundDataMode; override;
-
-    function  ReadData(Buffer : Pointer; Sz : Integer;
-                              {%H-}Par : Pointer) : Integer; override;
+    function  ReadData(Buffer : Pointer; Sz : ISoundFrameSize;
+                              {%H-}Par : Pointer) : ISoundFrameSize; override;
     procedure ResetToStart; override;
   end;
 
@@ -444,22 +436,14 @@ type
   public
     function Ref : pOggVorbisDec; inline;
 
-    function  DataMode : TOGGSoundDataMode; override;
-
-    function  ReadData(Buffer : Pointer; Sz : Integer;
-                              {%H-}Par : Pointer) : Integer; override;
+    function  ReadData(Buffer : Pointer; Sz : ISoundFrameSize;
+                              {%H-}Par : Pointer) : ISoundFrameSize; override;
     procedure ResetToStart; override;
   end;
 
   { TVorbisOggStreamingFileDecoder }
 
   TVorbisOggStreamingFileDecoder = class(TVorbisOggFileDecoder)
-  private
-    fStream : TStream;
-  protected
-    function DoRead(_ptr : Pointer; _nbytes : Integer) : Integer; override;
-    function DoSeek(_offset:Int64; _whence:Integer): Integer; override;
-    function DoTell:Int64; override;
   public
     constructor Create(aStream : TStream);
     procedure SetStream(aStream : TStream);
@@ -468,10 +452,6 @@ type
   { TVorbisOggStreamingAltDecoder }
 
   TVorbisOggStreamingAltDecoder = class(TVorbisOggAltDecoder)
-  private
-    fStream : TStream;
-  protected
-    function DoRead(_ptr : Pointer; _nbytes : Integer) : Integer; override;
   public
     constructor Create(aStream : TStream);
     procedure SetStream(aStream : TStream);
@@ -479,21 +459,18 @@ type
 
   { TVorbisFile }
 
-  TVorbisFile = class(TOGGSoundFile)
+  TVorbisFile = class(TSoundFile)
   protected
-    function InitEncoder(aMode : TOGGSoundEncoderMode;
-                   aChannels : Cardinal;
-                   aFreq, aBitrate, aBitdepth : Cardinal;
-                   aQuality : Single;
-                   aComments : IOGGComment) : TOGGSoundEncoder; override;
-    function InitDecoder : TOGGSoundDecoder; override;
+    function InitEncoder(aProps : ISoundEncoderProps;
+                   aComments : ISoundComment) : ISoundEncoder; override;
+    function InitDecoder : ISoundDecoder; override;
   end;
 
   { TVorbisFileAlt }
 
   TVorbisFileAlt = class(TVorbisFile)
   protected
-    function InitDecoder : TOGGSoundDecoder; override;
+    function InitDecoder : ISoundDecoder; override;
   end;
 
   { TVorbis }
@@ -512,16 +489,10 @@ type
     class function NewDecoder(inf : IVorbisInfo) : IVorbisDecoder;
 
     class function NewOggStreamEncoder(aStream : TStream;
-                                       aMode : TOGGSoundEncoderMode;
-                                       aChannels : Cardinal;
-                                       aFreq, aBitrate, aBitdepth : Cardinal;
-                                       aQuality : Single;
+                                       aProps : ISoundEncoderProps;
                                        aComments : IOGGComment) : TVorbisOggEncoder;
     class function NewOggStreamFileDecoder(aStream : TStream) : TVorbisOggDecoder;
     class function NewOggStreamAltDecoder(aStream : TStream) : TVorbisOggDecoder;
-
-    class procedure UninterleaveSamples(BufW, Buffer : Pointer;
-            samples, Channels, BitDepth : integer);
 
     class function VorbisLibsLoad(const aVorbisLibs : Array of String) : Boolean;
     class function VorbisLibsLoadDefault : Boolean;
@@ -548,7 +519,7 @@ function ops_read_func(ptr : pointer; size, nmemb: csize_t; datasource : Pointer
 begin
   if (size = 0) or (nmemb = 0) then begin Result := 0; Exit; end;
   try
-    Result := Int64(TVorbisOggDecoder(datasource).DoRead(ptr, size * nmemb)) div Int64(size);
+    Result := Int64(TVorbisOggDecoder(datasource).Reader.DoRead(ptr, size * nmemb)) div Int64(size);
   except
     Result := 0;
   end;
@@ -556,7 +527,7 @@ end;
 
 function ops_seek_func(datasource : pointer; offset: Int64; whence: Integer): Integer; cdecl;
 begin
-  Result := TVorbisOggDecoder(datasource).DoSeek(offset, whence);
+  Result := TVorbisOggDecoder(datasource).Reader.DoSeek(offset, whence);
 end;
 
 function ops_close_func(datasource : pointer): Integer; cdecl;
@@ -566,7 +537,7 @@ end;
 
 function ops_tell_func(datasource : pointer): clong; cdecl;
 begin
-  Result := TVorbisOggDecoder(datasource).DoTell;
+  Result := TVorbisOggDecoder(datasource).Reader.DoTell;
 end;
 
 { TVorbisOggDecoder }
@@ -592,9 +563,9 @@ begin
   Result := Assigned(fRef);
 end;
 
-function TVorbisOggDecoder.GetBitdepth : Cardinal;
+function TVorbisOggDecoder.GetSampleSize : TSoundSampleSize;
 begin
-  Result := 16;
+  Result := ss16bit;
 end;
 
 function TVorbisOggDecoder.GetBitrate : Cardinal;
@@ -701,26 +672,23 @@ end;
 
 { TVorbisFile }
 
-function TVorbisFile.InitEncoder(aMode : TOGGSoundEncoderMode;
-  aChannels : Cardinal; aFreq, aBitrate, aBitdepth : Cardinal;
-  aQuality : Single; aComments : IOGGComment) : TOGGSoundEncoder;
+function TVorbisFile.InitEncoder(aProps : ISoundEncoderProps;
+        aComments : ISoundComment) : ISoundEncoder;
 begin
-  Result := TVorbis.NewOggStreamEncoder(Stream, aMode, aChannels, aFreq,
-                                            aBitrate,
-                                            aBitdepth, aQuality,
-                                            aComments);
+  Result := TVorbis.NewOggStreamEncoder(Stream, aProps,
+                                     aComments as IOGGComment) as ISoundEncoder;
 end;
 
-function TVorbisFile.InitDecoder : TOGGSoundDecoder;
+function TVorbisFile.InitDecoder : ISoundDecoder;
 begin
-  Result := TVorbis.NewOggStreamFileDecoder(Stream);
+  Result := TVorbis.NewOggStreamFileDecoder(Stream) as ISoundDecoder;
 end;
 
 { TVorbisFileAlt }
 
-function TVorbisFileAlt.InitDecoder : TOGGSoundDecoder;
+function TVorbisFileAlt.InitDecoder : ISoundDecoder;
 begin
-  Result := TVorbis.NewOggStreamAltDecoder(Stream);
+  Result := TVorbis.NewOggStreamAltDecoder(Stream) as ISoundDecoder;
 end;
 
 { TVorbisOggFileDecoder }
@@ -772,22 +740,21 @@ begin
   Result := pOggVorbisFileDec(fRef);
 end;
 
-function TVorbisOggFileDecoder.DataMode : TOGGSoundDataMode;
-begin
-  Result := odmBytes;
-end;
-
-function TVorbisOggFileDecoder.ReadData(Buffer : Pointer; Sz : Integer;
-  Par : Pointer) : Integer;
+function TVorbisOggFileDecoder.ReadData(Buffer : Pointer; Sz : ISoundFrameSize;
+  Par : Pointer) : ISoundFrameSize;
 var
-  Size, Section, Res: Integer;
+  Section, Res: Integer;
 begin
-  Size := 0;
-  while (Size < Sz) do begin
-    Res := ov_read(fRef, @(PByte(Buffer)[Size]), Sz - Size, 0, 2, 1, @Section);
-    if Res > 0 then inc(Size, Res) else break;
+  Section := 0;
+  Result := TOGLSound.NewEmptyFrame(Sz);
+  while Result.Less(Sz) do begin
+    Res := ov_read(fRef, @(PByte(Buffer)[Result.AsBytes]),
+                         Sz.AsBytes - Result.AsBytes,
+                         0, 2, 1, @Section);
+    if Res > 0 then
+      Result.IncBytes(Res) else
+      break;
   end;
-  Result := Size;
 end;
 
 procedure TVorbisOggFileDecoder.ResetToStart;
@@ -803,7 +770,7 @@ begin
   aBuffer := OggState.Buffer(DecoderReadBufferSize);
   if Assigned(aBuffer) then
   begin
-    Result := DoRead(aBuffer, DecoderReadBufferSize);
+    Result := Reader.DoRead(aBuffer, DecoderReadBufferSize);
     OggState.Wrote(Result);
   end else
     Result := -1;
@@ -930,13 +897,8 @@ begin
   Result := pOggVorbisDec(fRef);
 end;
 
-function TVorbisOggAltDecoder.DataMode : TOGGSoundDataMode;
-begin
-  Result := odmBytes;
-end;
-
-function TVorbisOggAltDecoder.ReadData(Buffer : Pointer; Sz : Integer;
-  Par : Pointer) : Integer;
+function TVorbisOggAltDecoder.ReadData(Buffer : Pointer; Sz : ISoundFrameSize;
+  Par : Pointer) : ISoundFrameSize;
 const OGG_DECODE_STATE_EOF = Byte(10);
       OGG_DECODE_STATE_NEXT_PAGE = Byte(0);
       OGG_DECODE_STATE_NEXT_PACKET = Byte(1);
@@ -946,8 +908,8 @@ var
   ptr : PInt16;
   ch  : pcfloat;
 begin
-  Result := 0;
-  while (Result < Sz) and (Ref^.state <> OGG_DECODE_STATE_EOF) do
+  Result := TOGLSound.NewEmptyFrame(Sz);
+  while (Result.Less(Sz)) and (Ref^.state <> OGG_DECODE_STATE_EOF) do
   begin
     case Ref^.state of
       OGG_DECODE_STATE_NEXT_PAGE : begin
@@ -991,7 +953,7 @@ begin
           samples := Decoder.PCMOut(@(Ref^.pcm_buffer));
           if samples > 0 then
           begin
-            res := (Sz - Result) div Channels div SizeOf(Int16);
+            res := Sz.AsSamples - Result.AsSamples;
 
             if res = 0 then Break;
 
@@ -1001,9 +963,9 @@ begin
 
             { convert floats to 16 bit signed ints (host order) and
               interleave }
-            for i := 0 to Channels-1 do
+            for i := 0 to GetChannels-1 do
             begin
-              ptr := @(PInt16(@(PByte(Buffer)[Result]))[i]);
+              ptr := @(PInt16(@(PByte(Buffer)[Result.AsBytes]))[i]);
               ch  := pcfloat(PPointer(Ref^.pcm_buffer)[i]);
               for j := 0 to bout-1 do
               begin
@@ -1016,11 +978,11 @@ begin
                   res := -32768;
 
                 ptr^ := res;
-                Inc(ptr, Channels);
+                Inc(ptr, GetChannels);
               end;
             end;
 
-            Inc(Result, bout * Channels * Sizeof(int16));
+            Result.IncSamples(bout);
 
             Decoder.Read(bout);
           end else
@@ -1039,90 +1001,49 @@ end;
 
 { TVorbisOggStreamingAltDecoder }
 
-function TVorbisOggStreamingAltDecoder.DoRead(_ptr : Pointer; _nbytes : Integer
-  ) : Integer;
-begin
-  Result := fStream.Read(_ptr^, _nbytes);
-end;
-
 constructor TVorbisOggStreamingAltDecoder.Create(aStream : TStream);
 begin
-  fStream := aStream;
+  InitReader(TOGLSound.NewStreamReader(aStream));
   inherited Create;
 end;
 
 procedure TVorbisOggStreamingAltDecoder.SetStream(aStream : TStream);
 begin
-  if fStream <> aStream then
-  begin
-    fStream := aStream;
-    Ref^.state := 0;
-  end;
+  (Reader as TSoundStreamDataReader).Stream := aStream;
+  Ref^.state := 0;
 end;
 
 { TVorbisOggStreamingFileDecoder }
 
-function TVorbisOggStreamingFileDecoder.DoRead(_ptr : Pointer; _nbytes : Integer
-  ) : Integer;
-begin
-  Result := fStream.Read(_ptr^, _nbytes);
-end;
-
-function TVorbisOggStreamingFileDecoder.DoSeek(_offset : Int64; _whence : Integer
-  ) : Integer;
-begin
-  try
-    with fStream do
-      case _whence of
-        0: Seek(_offset, soBeginning);
-        1: Seek(_offset, soCurrent);
-        2: Seek(_offset, soEnd);
-      end;
-    result := 0;
-  except
-    result := -1;
-  end;
-end;
-
-function TVorbisOggStreamingFileDecoder.DoTell : Int64;
-begin
-  try
-    result := fStream.Position;
-  except
-    result := -1;
-  end;
-end;
-
 constructor TVorbisOggStreamingFileDecoder.Create(aStream : TStream);
 begin
-  fStream := aStream;
+  InitReader(TOGLSound.NewStreamReader(aStream));
   inherited Create;
 end;
 
 procedure TVorbisOggStreamingFileDecoder.SetStream(aStream : TStream);
 begin
-  fStream := aStream;
+  (Reader as TSoundStreamDataReader).Stream := aStream;
 end;
 
 { TVorbisOggStreamingEncoder }
 
 procedure TVorbisOggStreamingEncoder.FlushOggStream;
 begin
-  OggStream.PagesOutToStream(fStream);
+  OggStream.PagesOutToStream((Writer as TSoundStreamDataWriter).Stream);
 end;
 
 constructor TVorbisOggStreamingEncoder.Create(aStream : TStream;
-  aMode : TOGGSoundEncoderMode; aChannels : Cardinal; aFreq,
-  aBitrate, aBitdepth : Cardinal; aQuality : Single;
+  aProps : ISoundEncoderProps;
   aComments : IOGGComment);
 begin
-  fStream := aStream;
-  inherited Create(aMode, aChannels, aFreq, aBitrate, aBitdepth, aQuality, aComments);
+  InitWriter(TOGLSound.NewStreamWriter(aStream));
+  inherited Create(aProps, aComments);
 end;
 
 procedure TVorbisOggStreamingEncoder.SetStream(aStream : TStream);
 begin
-  fStream := aStream;
+  (Writer as TSoundStreamDataWriter).Stream := aStream;
 end;
 
 procedure TVorbisOggStreamingEncoder.ReInitEncoder;
@@ -1135,33 +1056,42 @@ end;
 
 { TVorbisOggEncoder }
 
-procedure TVorbisOggEncoder.Init(aMode : TOGGSoundEncoderMode;
-  aChannels : Cardinal; aFreq, aBitrate, aBitdepth : Cardinal;
-  aQuality : Single; aComments : IOGGComment);
+procedure TVorbisOggEncoder.Init(aProps : ISoundEncoderProps;
+  aComments : ISoundComment);
+var
+  aMode : TSoundEncoderMode;
+  aSampleSize : TSoundSampleSize;
+
 begin
+  aMode := aProps.GetDefault(TOGLSound.PROP_MODE, oemVBR);
+  aSampleSize := aProps.GetDefault(TOGLSound.PROP_SAMPLE_SIZE, ss16bit);
+
+
   fRef := GetMem(Sizeof(OggVorbisEnc));
   FillByte(fRef^, Sizeof(OggVorbisEnc), 0);
 
   fRef^.oggs := TOGG.NewStream(Abs(Random(Int64(Now))));
   if Assigned(aComments) then
   begin
-    fComm := aComments;
+    fComm := aComments as IOGGComment;
   end else
     FComm := TVorbis.NewComment;
   fRef^.info := TVorbis.NewInfo;
 
   if aMode = oemVBR then
   begin
-    fRef^.enc := TVorbis.NewEncoderVBR(fRef^.info, aChannels,
-                                            aFreq, aQuality);
+    fRef^.enc := TVorbis.NewEncoderVBR(fRef^.info, aProps.Channels,
+                                            aProps.Frequency,
+                                            aProps.Quality);
   end else
   if aMode = oemCBR then
   begin
-    fRef^.enc := TVorbis.NewEncoderABR(fRef^.info, aChannels,
-                                            aFreq, -1, aBitrate, -1);
+    fRef^.enc := TVorbis.NewEncoderABR(fRef^.info, aProps.Channels,
+                                            aProps.Frequency,
+                                            -1, aProps.Bitrate, -1);
   end;
   fRef^.block := Encoder.InitBlock;
-  fRef^.bitdepth := aBitdepth;
+  fRef^.ssize := aSampleSize;
   fRef^.mode := aMode;
 end;
 
@@ -1177,9 +1107,9 @@ begin
   fComm := nil;
 end;
 
-function TVorbisOggEncoder.GetBitdepth : Cardinal;
+function TVorbisOggEncoder.GetSampleSize : TSoundSampleSize;
 begin
-  Result := fRef^.bitdepth;
+  Result := fRef^.ssize;
 end;
 
 function TVorbisOggEncoder.GetBitrate : Cardinal;
@@ -1197,7 +1127,7 @@ begin
   Result := fRef^.info.Rate;
 end;
 
-function TVorbisOggEncoder.GetMode : TOGGSoundEncoderMode;
+function TVorbisOggEncoder.GetMode : TSoundEncoderMode;
 begin
   Result := fRef^.mode;
 end;
@@ -1232,12 +1162,10 @@ begin
   Result := fRef
 end;
 
-constructor TVorbisOggEncoder.Create(aMode : TOGGSoundEncoderMode;
-  aChannels : Cardinal; aFreq, aBitrate, aBitdepth : Cardinal; aQuality : Single;
+constructor TVorbisOggEncoder.Create(aProps : ISoundEncoderProps;
   aComments : IOGGComment);
 begin
-  Init(aMode, aChannels, aFreq, aBitrate, aBitdepth, aQuality,
-              aComments);
+  Init(aProps, aComments);
 end;
 
 destructor TVorbisOggEncoder.Destroy;
@@ -1251,27 +1179,23 @@ begin
   Result := fComm;
 end;
 
-function TVorbisOggEncoder.DataMode : TOGGSoundDataMode;
-begin
-  Result := odmSamples;
-end;
-
-function TVorbisOggEncoder.WriteData(Buffer : Pointer; Count : Integer;
-  Par : Pointer) : Integer;
+function TVorbisOggEncoder.WriteData(Buffer : Pointer; Count : ISoundFrameSize;
+  Par : Pointer) : ISoundFrameSize;
 var
   BufW : Pointer;
 begin
-  if Count > 0 then
+  if Count.IsValid then
   begin
-    BufW := Encoder.GetBuffer(Count);
-    TVorbis.UninterleaveSamples(BufW, Buffer, Count, GetChannels, GetBitDepth);
-    Encoder.Wrote(Count);
+    BufW := Encoder.GetBuffer(Count.AsSamples);
+    UninterleaveSamples(Buffer, PPointer(BufW), GetSampleSize, ssFloat, false,
+                                                  GetChannels, Count.AsSamples);
+    Encoder.Wrote(Count.AsSamples);
 
     Flush(Par);
 
-    Result := Count;
+    Result := TOGLSound.NewFrame(Count);
   end else
-    Result := 0;
+    Result := TOGLSound.NewErrorFrame;
 end;
 
 procedure TVorbisOggEncoder.WriteHeader(Par : Pointer);
@@ -1715,16 +1639,9 @@ begin
 end;
 
 class function TVorbis.NewOggStreamEncoder(aStream : TStream;
-  aMode : TOGGSoundEncoderMode; aChannels : Cardinal; aFreq, aBitrate,
-  aBitdepth : Cardinal; aQuality : Single; aComments : IOGGComment
-  ) : TVorbisOggEncoder;
+  aProps : ISoundEncoderProps; aComments : IOGGComment) : TVorbisOggEncoder;
 begin
-  Result := TVorbisOggStreamingEncoder.Create(aStream, aMode, aChannels,
-                                            aFreq,
-                                            aBitrate,
-                                            aBitdepth,
-                                            aQuality,
-                                            aComments);
+  Result := TVorbisOggStreamingEncoder.Create(aStream, aProps, aComments);
 end;
 
 class function TVorbis.NewOggStreamFileDecoder(aStream : TStream
@@ -1737,29 +1654,6 @@ class function TVorbis.NewOggStreamAltDecoder(aStream : TStream
   ) : TVorbisOggDecoder;
 begin
   Result := TVorbisOggStreamingAltDecoder.Create(aStream);
-end;
-
-class procedure TVorbis.UninterleaveSamples(BufW, Buffer : Pointer; samples,
-  Channels, BitDepth : integer);
-var i : integer;
-    fb : PPointer absolute BufW;
-begin
-  if BitDepth <> 16 then Exit;
-  if Channels = 1 then
-  begin
-    for i:=0 to samples-1 do
-    begin
-      PSingle(fb[0])[i]:=Single(PSmallInt(Buffer)[i]) / 32768.0;
-    end;
-  end else
-  if Channels = 2 then
-  begin
-    for i:=0 to samples-1 do
-    begin
-        PSingle(fb[0])[i]:=Single(PSmallInt(Buffer)[i*2])   / 32768.0;
-        PSingle(fb[1])[i]:=Single(PSmallInt(Buffer)[i*2+1]) / 32768.0;
-    end;
-  end;
 end;
 
 class function TVorbis.VorbisLibsLoad(const aVorbisLibs : array of String

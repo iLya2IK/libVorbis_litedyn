@@ -93,6 +93,7 @@
       <Unit>
         <Filename Value="oggvorbis.lpr"/>
         <IsPartOfProject Value="True"/>
+        <UnitName Value="vorbisstreaming"/>
       </Unit>
     </Units>
   </ProjectOptions>

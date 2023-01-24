@@ -13,7 +13,7 @@
 
    step 1.
    cInputFile->VorbisOggDecoder->[pcm]->VorbisEncoder->[ogg packets]->cStreamFile[N]
-   step 2.
+   step 2.                       Files
    cStreamFile[N]->VorbisAltDecoder->[pcm]->VorbisOggEncoder->[ogg container]->cOutputFile
 }
 
@@ -23,7 +23,7 @@ uses
   cthreads,
   {$endif}
   Classes, SysUtils,
-  OGLVorbisWrapper, OGLOGGWrapper;
+  OGLVorbisWrapper, OGLOGGWrapper, OGLSoundUtils, OGLSoundUtilTypes;
 
 const // the name of source vorbis-ogg file
       cInputFile  = '..' + PathDelim + 'media' + PathDelim + 'testing.ogg';
@@ -55,12 +55,16 @@ var
   pack_dec : TVorbisOggDecoder;  // Vorbis custom streaming decoder
   aFileStream : TFileStream;     // TFileStream linked to cStreamFile
   Buffer : Pointer;              // intermediate buffer
-  i, len, frame_len,             // length of data
-    bitrate : Integer;           // current bitrate
-  MaxLength : Integer;           // chunck size of decoded data in bytes
+  len : ISoundFrameSize;         // length of data
+  MaxLength,
+  ChunkLength,
+  frame_len : ISoundFrameSize;   // total length of frame
+  i,  bitrate : Integer;         // current bitrate
   fEOF  : Boolean;
   Files : TStringList;
   aFile : String;
+
+  aEncProps : ISoundEncoderProps; // encoder properties
 begin
   // Initialize vorbis, vorbisenc, vorbisfile interfaces - load libraries
   {$ifdef Windows}
@@ -77,21 +81,25 @@ begin
       if oggf.LoadFromFile(cInputFile, false) then
       begin
         // cInputFile opended and headers/coments are loaded
-        MaxLength := cChunckDuration * oggf.Decoder.Frequency *
-                      oggf.Decoder.Channels * sizeof(int16) div 1000;
+        MaxLength := oggf.Decoder.FrameFromDuration(cChunckDuration);
+        ChunkLength := oggf.Decoder.FrameFromBytes(cChunckSize);
         // get the file bitrate from vorbis-ogg decoder
         bitrate := oggf.Decoder.Bitrate;
+
+        // gen encoder properties
+        // quality = 0.5
+        aEncProps := TOGLSound.EncProps([TOGLSound.PROP_MODE, oemVBR,
+                                         TOGLSound.PROP_CHANNELS, oggf.Channels,
+                                         TOGLSound.PROP_FREQUENCY, oggf.Frequency,
+                                         TOGLSound.PROP_BITRATE, bitrate,
+                                         TOGLSound.PROP_SAMPLE_SIZE, ss16bit,
+                                         TOGLSound.PROP_QUALITY, 0.5]);
 
         // initialize intermediate buffer to store decoded data chunk
         Buffer := GetMem(cChunckSize);
         try
           // initialize custom streaming encoder
-          // complexity = 0.5
-          pack_enc := TVorbis.NewOggStreamEncoder(nil, oemVBR,
-                                                       oggf.Channels,
-                                                       oggf.Frequency,
-                                                       bitrate, 16, 0.5,
-                                                       nil);
+          pack_enc := TVorbis.NewOggStreamEncoder(nil, aEncProps, nil);
           try
             fEOF := false;
             while not fEOF do
@@ -116,22 +124,21 @@ begin
                   end;
                 end;
 
-                frame_len := 0;
+                frame_len := TOGLSound.NewEmptyFrame(MaxLength);
                 repeat
                   // read decoded pcm data from vorbis-ogg file
                   // len - length of decoded data in bytes
-                  len := oggf.ReadData(Buffer, cChunckSize, nil);
+                  len := oggf.ReadData(Buffer, ChunkLength, nil);
 
-                  if len > 0 then
+                  if len.IsValid then
                   begin
-                    Inc(frame_len, len);
+                    frame_len.Inc(len);
                     // this is where pcm data is encoded into the vorbis packets.
-                    pack_enc.WriteData(Buffer, len div
-                                               oggf.Channels div
-                                               sizeof(int16), nil);
+                    pack_enc.WriteData(Buffer, len, nil);
                   end else
                     fEOF := true;
-                until (len < cChunckSize) or (frame_len >= MaxLength);
+                until len.Less(ChunkLength) or
+                      frame_len.GreaterOrEqual(MaxLength) or fEOF;
 
                 if fEOF or cHeaderEveryFrame then
                   // complete the stream formation process.
@@ -152,9 +159,7 @@ begin
         // Config TVorbisFile to encode state (vorbisenc mode)
         // and create/open to write cOutputFile
         // quality = 0.5
-        if oggf.SaveToFile(cOutputFile, oemVBR, oggf.Channels,
-                                                oggf.Frequency,
-                                                bitrate, 16, 0.5, nil) then
+        if oggf.SaveToFile(cOutputFile, aEncProps, nil) then
         begin
           // cOutputFile has been created/opened and headers/comments have
           // been
@@ -180,16 +185,14 @@ begin
               try
                 repeat
                   // read decoded pcm data from vorbis streaming file
-                  len := pack_dec.ReadData(Buffer, cChunckSize, nil);
+                  len := pack_dec.ReadData(Buffer, ChunkLength, nil);
 
-                  if len > 0 then begin
+                  if len.IsValid then begin
                     // this is where pcm data samples are encoded into the
                     // vorbis-ogg format and then written to the vorbis-ogg file.
-                    oggf.WriteSamples(Buffer, len div
-                                                  sizeof(int16) div
-                                                     pack_dec.Channels, nil);
+                    oggf.WriteData(Buffer, len, nil);
                   end;
-                until len < cChunckSize;
+                until len.Less(ChunkLength);
               finally
                 aFileStream.Free;
               end;
