@@ -99,7 +99,8 @@ begin
         Buffer := GetMem(cChunckSize);
         try
           // initialize custom streaming encoder
-          pack_enc := TVorbis.NewOggStreamEncoder(nil, aEncProps, nil);
+          pack_enc := TVorbis.NewOggStreamEncoder(nil, [sdpForceNotSeekable],
+                                                       aEncProps, nil);
           try
             fEOF := false;
             while not fEOF do
