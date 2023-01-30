@@ -103,7 +103,7 @@ type
   function SetupVBR(channels: Integer; rate: Int64; quality: Single): Boolean;
   function SetupInit: Boolean;
 
-  procedure HeaderOut(vc : IOGGComment; header, header_comm, header_code : IOGGPacket);
+  procedure HeaderOut(vc : ISoundComment; header, header_comm, header_code : IOGGPacket);
 
   function  GetBuffer(BufSize : Integer) : Pointer;
   procedure Wrote(Sz : Integer);
@@ -120,7 +120,7 @@ type
   ['{6BAAAF6B-4353-424F-A89A-EA0C283326E0}']
 
   function IDHeader(op: IOGGPacket): integer;
-  function HeaderIn(vc: IOGGComment; op: IOGGPacket): integer;
+  function HeaderIn(vc: ISoundComment; op: IOGGPacket): integer;
   function Restart : Integer;
 
   function BlockIn(b : IVorbisBlock) : Integer;
@@ -171,7 +171,7 @@ type
     function SetupVBR(channels: Integer; rate: Int64; quality: Single): Boolean;
     function SetupInit: Boolean;
 
-    procedure HeaderOut(vc : IOGGComment; header, header_comm, header_code : IOGGPacket);
+    procedure HeaderOut(vc : ISoundComment; header, header_comm, header_code : IOGGPacket);
 
     function  GetBuffer(BufSize : Integer) : Pointer;
     procedure Wrote(Sz : Integer);
@@ -192,7 +192,7 @@ type
     constructor CreateNotInit(inf : IVorbisInfo);
 
     function IDHeader(op: IOGGPacket): Integer;
-    function HeaderIn(vc: IOGGComment; op: IOGGPacket): Integer;
+    function HeaderIn(vc: ISoundComment; op: IOGGPacket): Integer;
     function Restart : Integer;
 
     function BlockIn(b : IVorbisBlock) : Integer;
@@ -207,27 +207,34 @@ type
 
   { TRefVorbisComment }
 
-  TRefVorbisComment = class(TInterfacedObject, IOGGComment)
+  TRefVorbisComment = class(TNativeVorbisCommentCloneable)
   private
     FRef : pvorbis_comment;
-    procedure Init;
-    procedure Done;
+  protected
+    procedure Init; override;
+    procedure Done; override;
+
+    procedure SetVendor(const S : String); override;
+    procedure SetNativeVendor(v : PChar); override;
+    function GetNativeVendor : PChar; override;
+    function GetNativeComment(index : integer) : PChar; override;
+    function GetNativeCommentLength(index : integer) : Int32; override;
+    function GetNativeCommentCount : Int32; override;
   public
-    function Ref : Pointer; inline;
+    function Ref : Pointer; override;
 
-    constructor Create(aRef : pvorbis_comment);
+    constructor Create(aRef : pvorbis_comment); overload;
 
-    procedure Add(const comment: String);
-    procedure AddTag(const tag, value: String);
-    function Query(const tag: String; index: Integer): String;
-    function QueryCount(const tag: String): Integer;
+    procedure Add(const comment: String); override;
+    procedure AddTag(const tag, value: String); override;
+    function Query(const tag: String; index: Integer): String; override;
+    function QueryCount(const tag: String): Integer; override;
   end;
 
   { TUniqVorbisComment }
 
   TUniqVorbisComment = class(TRefVorbisComment)
   public
-    constructor Create;
     destructor Destroy; override;
   end;
 
@@ -306,7 +313,7 @@ type
   TVorbisOggEncoder = class(TSoundAbstractEncoder)
   private
     fRef : pOggVorbisEnc;
-    fComm : IOGGComment;
+    fComm : ISoundComment;
   protected
     procedure Init(aProps : ISoundEncoderProps;
                    aComments : ISoundComment); override;
@@ -326,10 +333,10 @@ type
   public
     function Ref : pOggVorbisEnc; inline;
 
-    constructor Create(aProps : ISoundEncoderProps; aComments : IOGGComment);
+    constructor Create(aProps : ISoundEncoderProps; aComments : ISoundComment);
     destructor Destroy; override;
 
-    function  Comments : IOGGComment; override;
+    function  Comments : ISoundComment; override;
 
     function  WriteData(Buffer : Pointer; Count : ISoundFrameSize;
                                {%H-}Par : Pointer) : ISoundFrameSize; override;
@@ -348,7 +355,7 @@ type
   public
     constructor Create(aStream : TStream; aDataLimits : TSoundDataLimits;
                        aProps : ISoundEncoderProps;
-                       aComments : IOGGComment);
+                       aComments : ISoundComment);
     procedure SetStream(aStream : TStream);
     procedure ReInitEncoder;
   end;
@@ -365,7 +372,7 @@ type
   TVorbisOggDecoder = class(TSoundAbstractDecoder)
   private
     fRef  : Pointer;
-    fComm : IOGGComment;
+    fComm : ISoundComment;
 
   protected
     function GetSampleSize : TSoundSampleSize; override;
@@ -379,7 +386,7 @@ type
     constructor Create;
     destructor Destroy; override;
 
-    function  Comments : IOGGComment; override;
+    function  Comments : ISoundComment; override;
 
     function Ready : Boolean; override;
   end;
@@ -487,8 +494,9 @@ type
 
   TVorbis = class
   public
-    class function NewComment : IOGGComment;
-    class function RefComment(aRef : pvorbis_comment) : IOGGComment;
+    class function NewComment : ISoundComment;
+    class function NewComment(src : ISoundComment) : ISoundComment;
+    class function RefComment(aRef : pvorbis_comment) : ISoundComment;
     class function NewEncoder(inf : IVorbisInfo) : IVorbisEncoder;
     class function NewEncoderVBR(inf : IVorbisInfo;
       channels: Integer; rate: Int64; base_quality: Single) : IVorbisEncoder;
@@ -501,7 +509,7 @@ type
     class function NewOggStreamEncoder(aStream : TStream;
                                        aDataLimits : TSoundDataLimits;
                                        aProps : ISoundEncoderProps;
-                                       aComments : IOGGComment) : TVorbisOggEncoder;
+                                       aComments : ISoundComment) : TVorbisOggEncoder;
     class function NewOggStreamFileDecoder(aStream : TStream;
                                            aDataLimits : TSoundDataLimits) : TVorbisOggDecoder;
     class function NewOggStreamAltDecoder(aStream : TStream) : TVorbisOggDecoder;
@@ -565,7 +573,7 @@ begin
   inherited Destroy;
 end;
 
-function TVorbisOggDecoder.Comments : IOGGComment;
+function TVorbisOggDecoder.Comments : ISoundComment;
 begin
   Result := fComm;
 end;
@@ -624,7 +632,7 @@ begin
   Result := vorbis_synthesis_idheader(op.Ref);
 end;
 
-function TVorbisDecoder.HeaderIn(vc : IOGGComment; op : IOGGPacket) : Integer;
+function TVorbisDecoder.HeaderIn(vc : ISoundComment; op : IOGGPacket) : Integer;
 begin
   Result := vorbis_synthesis_headerin(Info.Ref, vc.Ref, op.Ref);
 end;
@@ -671,11 +679,6 @@ end;
 
 { TUniqVorbisComment }
 
-constructor TUniqVorbisComment.Create;
-begin
-  Init;
-end;
-
 destructor TUniqVorbisComment.Destroy;
 begin
   Done;
@@ -688,7 +691,7 @@ function TVorbisFile.InitEncoder(aProps : ISoundEncoderProps;
                                  aComments : ISoundComment) : ISoundEncoder;
 begin
   Result := TVorbis.NewOggStreamEncoder(Stream, DataLimits, aProps,
-                                     aComments as IOGGComment) as ISoundEncoder;
+                                     aComments as ISoundComment) as ISoundEncoder;
 end;
 
 function TVorbisFile.InitDecoder : ISoundDecoder;
@@ -943,7 +946,15 @@ end;
 procedure TVorbisOggAltDecoder.Done;
 begin
   if Assigned(FRef) then
+  begin
+    Ref^.dec := nil;
+    Ref^.block := nil;
+    Ref^.osyn := nil;
+    Ref^.ostr := nil;
+    Ref^.page := nil;
+    Ref^.pack := nil;
     FreeMemAndNil(FRef);
+  end;
 end;
 
 function TVorbisOggAltDecoder.VorbisInfo : IVorbisInfo;
@@ -1126,7 +1137,7 @@ end;
 constructor TVorbisOggStreamingEncoder.Create(aStream : TStream;
   aDataLimits : TSoundDataLimits;
   aProps : ISoundEncoderProps;
-  aComments : IOGGComment);
+  aComments : ISoundComment);
 begin
   InitStream(TOGLSound.NewDataStream(aStream, aDataLimits));
   inherited Create(aProps, aComments);
@@ -1164,7 +1175,7 @@ begin
   fRef^.oggs := TOGG.NewStream(Abs(Random(Int64(Now))));
   if Assigned(aComments) then
   begin
-    fComm := aComments as IOGGComment;
+    fComm := aComments as ISoundComment;
   end else
     FComm := TVorbis.NewComment;
   fRef^.info := TVorbis.NewInfo;
@@ -1193,6 +1204,7 @@ begin
     fRef^.block := nil;
     fRef^.enc := nil;
     fRef^.info := nil;
+    fRef^.oggs := nil;
     FreeMemAndNil(fRef);
   end;
   fComm := nil;
@@ -1254,7 +1266,7 @@ begin
 end;
 
 constructor TVorbisOggEncoder.Create(aProps : ISoundEncoderProps;
-  aComments : IOGGComment);
+  aComments : ISoundComment);
 begin
   Init(aProps, aComments);
 end;
@@ -1265,7 +1277,7 @@ begin
   inherited Destroy;
 end;
 
-function TVorbisOggEncoder.Comments : IOGGComment;
+function TVorbisOggEncoder.Comments : ISoundComment;
 begin
   Result := fComm;
 end;
@@ -1454,7 +1466,7 @@ begin
   Result := vorbis_encode_setup_init(Info.Ref) = 0;
 end;
 
-procedure TVorbisEncoder.HeaderOut(vc : IOGGComment; header, header_comm,
+procedure TVorbisEncoder.HeaderOut(vc : ISoundComment; header, header_comm,
   header_code : IOGGPacket);
 begin
   vorbis_analysis_headerout(Ref,vc.Ref,header.Ref,header_comm.Ref,header_code.Ref);
@@ -1652,6 +1664,36 @@ begin
   end;
 end;
 
+procedure TRefVorbisComment.SetVendor(const S : String);
+begin
+  // not supported for libvorbisenc
+end;
+
+procedure TRefVorbisComment.SetNativeVendor(v : PChar);
+begin
+  // not supported for libvorbisenc
+end;
+
+function TRefVorbisComment.GetNativeVendor : PChar;
+begin
+  Result := PChar(fRef^.vendor);
+end;
+
+function TRefVorbisComment.GetNativeComment(index : integer) : PChar;
+begin
+  Result := PChar(fRef^.user_comments[index]);
+end;
+
+function TRefVorbisComment.GetNativeCommentLength(index : integer) : Int32;
+begin
+  Result := fRef^.comment_lengths[index];
+end;
+
+function TRefVorbisComment.GetNativeCommentCount : Int32;
+begin
+  Result := fRef^.comments;
+end;
+
 function TRefVorbisComment.Ref : Pointer;
 begin
   Result := FRef;
@@ -1665,33 +1707,40 @@ end;
 procedure TRefVorbisComment.Add(const comment : String);
 begin
   vorbis_comment_add(FRef, pcchar(pchar(comment)));
+  inherited Add(comment);
 end;
 
 procedure TRefVorbisComment.AddTag(const tag, value : String);
 begin
-  vorbis_comment_add_tag(@FRef, pcchar(pchar(tag)), pcchar(pchar(value)));
+  vorbis_comment_add_tag(FRef, pcchar(pchar(tag)), pcchar(pchar(value)));
+  inherited AddTag(tag, value);
 end;
 
-function TRefVorbisComment.Query(const tag : String; index : integer) : String;
+function TRefVorbisComment.Query(const tag : String; index : Integer) : String;
 begin
-  Result := StrPas( PChar(vorbis_comment_query(@FRef, pcchar(PChar(tag)), index)) );
+  Result := StrPas( PChar(vorbis_comment_query(FRef, pcchar(PChar(tag)), index)) );
 end;
 
-function TRefVorbisComment.QueryCount(const tag : String) : integer;
+function TRefVorbisComment.QueryCount(const tag : String) : Integer;
 begin
-  Result := vorbis_comment_query_count(@FRef, pcchar(PChar(tag)));
+  Result := vorbis_comment_query_count(FRef, pcchar(PChar(tag)));
 end;
 
 { TVorbis }
 
-class function TVorbis.NewComment : IOGGComment;
+class function TVorbis.NewComment : ISoundComment;
 begin
-  Result := TUniqVorbisComment.Create as IOGGComment;
+  Result := TUniqVorbisComment.Create as ISoundComment;
 end;
 
-class function TVorbis.RefComment(aRef : pvorbis_comment) : IOGGComment;
+class function TVorbis.NewComment(src : ISoundComment) : ISoundComment;
 begin
-  Result := TRefVorbisComment.Create(aRef) as IOGGComment;
+  Result := TUniqVorbisComment.CreateFromInterface(src) as ISoundComment;
+end;
+
+class function TVorbis.RefComment(aRef : pvorbis_comment) : ISoundComment;
+begin
+  Result := TRefVorbisComment.Create(aRef) as ISoundComment;
 end;
 
 class function TVorbis.NewEncoder(inf : IVorbisInfo) : IVorbisEncoder;
@@ -1731,7 +1780,7 @@ end;
 
 class function TVorbis.NewOggStreamEncoder(aStream : TStream;
   aDataLimits : TSoundDataLimits;
-  aProps : ISoundEncoderProps; aComments : IOGGComment) : TVorbisOggEncoder;
+  aProps : ISoundEncoderProps; aComments : ISoundComment) : TVorbisOggEncoder;
 begin
   Result := TVorbisOggStreamingEncoder.Create(aStream, aDataLimits, aProps, aComments);
 end;

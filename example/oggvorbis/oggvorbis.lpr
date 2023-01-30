@@ -113,6 +113,7 @@ function TOALVorbisDataRecorder.SaveToFile(const Fn : String) : Boolean;
 var
   ssize : TSoundSampleSize;
   channels : Cardinal;
+  comments : ISoundComment;
 begin
   case Format of
   oalfMono8 : begin
@@ -133,13 +134,17 @@ begin
     end;
   end;
 
+  comments := TVorbis.NewComment;
+  comments.Vendor := 'OALVorbisDataRecorder';
+  comments.AddTag(COMMENT_ARTIST, 'Your voice');
+  comments.AddTag(COMMENT_TITLE,  'Record');
   Result := FStream.SaveToFile(Fn,
             TOGLSound.EncProps([TOGLSound.PROP_MODE, oemVBR,
                                 TOGLSound.PROP_CHANNELS, channels,
                                 TOGLSound.PROP_FREQUENCY, Frequency,
                                 TOGLSound.PROP_SAMPLE_SIZE, ssize,
                                 TOGLSound.PROP_QUALITY, 0.5,
-                                TOGLSound.PROP_BITRATE, 128000]), nil);
+                                TOGLSound.PROP_BITRATE, 128000]), comments);
 end;
 
 function TOALVorbisDataRecorder.SaveToStream(Str : TStream) : Boolean;
@@ -169,12 +174,21 @@ const // name of file to capture data
                                              '..\libs\vorbisenc.dll',
                                              '..\libs\vorbisfile.dll');
       {$endif}
+      {$ifdef DEBUG}
+      cHeapTrace = 'heaptrace.trc';
+      {$endif}
 
 var
   OALCapture : TOALCapture; // OpenAL audio recoder
   OALPlayer  : TOALPlayer;  // OpenAL audio player
   dt: Integer;
 begin
+  {$ifdef DEBUG}
+  if FileExists(cHeapTrace) then
+     DeleteFile(cHeapTrace);
+  SetHeapTraceOutput(cHeapTrace);
+  {$endif}
+
   // Open vorbis, Ogg, OpenAL libraries and initialize interfaces
   {$ifdef Windows}
   if TOpenAL.OALLibsLoad([cOALDLL]) and

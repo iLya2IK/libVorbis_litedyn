@@ -48,6 +48,9 @@ const // the name of source vorbis-ogg file
                                            //         fragment of an ogg stream.
                                            //         the headers are only in
                                            //         the first file
+       {$ifdef DEBUG}
+       cHeapTrace = 'heaptrace.trc';
+       {$endif}
 
 var
   oggf : TVorbisFile; // interface to encode/decode vorbis-Ogg data
@@ -66,6 +69,12 @@ var
 
   aEncProps : ISoundEncoderProps; // encoder properties
 begin
+  {$ifdef DEBUG}
+  if FileExists(cHeapTrace) then
+     DeleteFile(cHeapTrace);
+  SetHeapTraceOutput(cHeapTrace);
+  {$endif}
+
   // Initialize vorbis, vorbisenc, vorbisfile interfaces - load libraries
   {$ifdef Windows}
   if TVorbis.VorbisLibsLoad(cVorbisDLL) and TOGG.OGGLibsLoad([cOGGDLL]) then
