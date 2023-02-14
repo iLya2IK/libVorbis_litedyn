@@ -214,8 +214,8 @@ type
     procedure Init; override;
     procedure Done; override;
 
-    procedure SetVendor(const S : String); override;
-    procedure SetNativeVendor(v : PChar); override;
+    procedure SetVendor(const {%H-}S : String); override;
+    procedure SetNativeVendor({%H-}v : PChar); override;
     function GetNativeVendor : PChar; override;
     function GetNativeComment(index : integer) : PChar; override;
     function GetNativeCommentLength(index : integer) : Int32; override;
@@ -329,7 +329,8 @@ type
 
     function OggStream : IOGGStreamState; inline;
     function Encoder : IVorbisEncoder; inline;
-    procedure FlushOggStream; virtual;
+    procedure WriteStreamPages(aFlush : Boolean);
+    procedure WriteOggStream({%H-}aFlush : Boolean); virtual;
   public
     function Ref : pOggVorbisEnc; inline;
 
@@ -347,16 +348,16 @@ type
     function Ready : Boolean; override;
   end;
 
-  { TVorbisOggStreamingEncoder }
+  { TVorbisOggStreamEncoder }
 
-  TVorbisOggStreamingEncoder = class(TVorbisOggEncoder)
+  TVorbisOggStreamEncoder = class(TVorbisOggEncoder, ISoundStreamEncoder)
   protected
-    procedure FlushOggStream; override;
+    procedure WriteOggStream(aFlush : Boolean); override;
   public
     constructor Create(aStream : TStream; aDataLimits : TSoundDataLimits;
                        aProps : ISoundEncoderProps;
                        aComments : ISoundComment);
-    procedure SetStream(aStream : TStream);
+    procedure SetStream(aStream : TStream); virtual;
     procedure ReInitEncoder;
   end;
 
@@ -458,20 +459,20 @@ type
     procedure ResetToStart; override;
   end;
 
-  { TVorbisOggStreamingFileDecoder }
+  { TVorbisOggStreamFileDecoder }
 
-  TVorbisOggStreamingFileDecoder = class(TVorbisOggFileDecoder)
+  TVorbisOggStreamFileDecoder = class(TVorbisOggFileDecoder, ISoundStreamDecoder)
   public
     constructor Create(aStream : TStream; aDataLimits : TSoundDataLimits);
-    procedure SetStream(aStream : TStream);
+    procedure SetStream(aStream : TStream); virtual;
   end;
 
-  { TVorbisOggStreamingAltDecoder }
+  { TVorbisOggStreamAltDecoder }
 
-  TVorbisOggStreamingAltDecoder = class(TVorbisOggAltDecoder)
+  TVorbisOggStreamAltDecoder = class(TVorbisOggAltDecoder, ISoundStreamDecoder)
   public
     constructor Create(aStream : TStream);
-    procedure SetStream(aStream : TStream);
+    procedure SetStream(aStream : TStream); virtual;
   end;
 
   { TVorbisFile }
@@ -509,10 +510,10 @@ type
     class function NewOggStreamEncoder(aStream : TStream;
                                        aDataLimits : TSoundDataLimits;
                                        aProps : ISoundEncoderProps;
-                                       aComments : ISoundComment) : TVorbisOggEncoder;
+                                       aComments : ISoundComment) : ISoundStreamEncoder;
     class function NewOggStreamFileDecoder(aStream : TStream;
-                                           aDataLimits : TSoundDataLimits) : TVorbisOggDecoder;
-    class function NewOggStreamAltDecoder(aStream : TStream) : TVorbisOggDecoder;
+                                           aDataLimits : TSoundDataLimits) : ISoundStreamDecoder;
+    class function NewOggStreamAltDecoder(aStream : TStream) : ISoundStreamDecoder;
 
     class function VorbisLibsLoad(const aVorbisLibs : Array of String) : Boolean;
     class function VorbisLibsLoadDefault : Boolean;
@@ -550,7 +551,7 @@ begin
   Result := TVorbisOggDecoder(datasource).DataStream.DoSeek(offset, whence);
 end;
 
-function ops_close_func(datasource : pointer): Integer; cdecl;
+function ops_close_func({%H-}datasource : pointer): Integer; cdecl;
 begin
   result := 0; 
 end;
@@ -1099,42 +1100,44 @@ begin
   inherited ResetToStart;
 end;
 
-{ TVorbisOggStreamingAltDecoder }
+{ TVorbisOggStreamAltDecoder }
 
-constructor TVorbisOggStreamingAltDecoder.Create(aStream : TStream);
+constructor TVorbisOggStreamAltDecoder.Create(aStream : TStream);
 begin
   InitStream(TOGLSound.NewDataStream(aStream, [sdpForceNotSeekable]));
   inherited Create;
 end;
 
-procedure TVorbisOggStreamingAltDecoder.SetStream(aStream : TStream);
+procedure TVorbisOggStreamAltDecoder.SetStream(aStream : TStream);
 begin
   (DataStream as TSoundDataStream).Stream := aStream;
   Ref^.state := 0;
 end;
 
-{ TVorbisOggStreamingFileDecoder }
+{ TVorbisOggStreamFileDecoder }
 
-constructor TVorbisOggStreamingFileDecoder.Create(aStream : TStream;
+constructor TVorbisOggStreamFileDecoder.Create(aStream : TStream;
   aDataLimits : TSoundDataLimits);
 begin
   InitStream(TOGLSound.NewDataStream(aStream, aDataLimits));
   inherited Create;
 end;
 
-procedure TVorbisOggStreamingFileDecoder.SetStream(aStream : TStream);
+procedure TVorbisOggStreamFileDecoder.SetStream(aStream : TStream);
 begin
   (DataStream as TSoundDataStream).Stream := aStream;
 end;
 
-{ TVorbisOggStreamingEncoder }
+{ TVorbisOggStreamEncoder }
 
-procedure TVorbisOggStreamingEncoder.FlushOggStream;
+procedure TVorbisOggStreamEncoder.WriteOggStream(aFlush : Boolean);
 begin
-  OggStream.PagesOutToStream((DataStream as TSoundDataStream).Stream);
+  if aFlush then
+    OggStream.PagesFlushToStream((DataStream as TSoundDataStream).Stream) else
+    OggStream.PagesOutToStream((DataStream as TSoundDataStream).Stream);
 end;
 
-constructor TVorbisOggStreamingEncoder.Create(aStream : TStream;
+constructor TVorbisOggStreamEncoder.Create(aStream : TStream;
   aDataLimits : TSoundDataLimits;
   aProps : ISoundEncoderProps;
   aComments : ISoundComment);
@@ -1143,12 +1146,12 @@ begin
   inherited Create(aProps, aComments);
 end;
 
-procedure TVorbisOggStreamingEncoder.SetStream(aStream : TStream);
+procedure TVorbisOggStreamEncoder.SetStream(aStream : TStream);
 begin
   (DataStream as TSoundDataStream).Stream := aStream;
 end;
 
-procedure TVorbisOggStreamingEncoder.ReInitEncoder;
+procedure TVorbisOggStreamEncoder.ReInitEncoder;
 begin
   // reset encoder
   OggStream.Reset;
@@ -1255,7 +1258,7 @@ begin
   Result := fRef^.enc;
 end;
 
-procedure TVorbisOggEncoder.FlushOggStream;
+procedure TVorbisOggEncoder.WriteOggStream({%H-}aFlush : Boolean);
 begin
   // do nothing
 end;
@@ -1294,7 +1297,7 @@ begin
                                                   GetChannels, Count.AsSamples);
     Encoder.Wrote(Count.AsSamples);
 
-    Flush(Par);
+    WriteStreamPages(False);
 
     Result := TOGLSound.NewFrame(Count);
   end else
@@ -1317,7 +1320,7 @@ begin
   OggStream.PacketIn(header_comm);
   OggStream.PacketIn(header_code);
 
-  FlushOggStream;
+  WriteOggStream(True);
 end;
 
 procedure TVorbisOggEncoder.Close(Par : Pointer);
@@ -1328,6 +1331,12 @@ begin
 end;
 
 procedure TVorbisOggEncoder.Flush(Par : Pointer);
+begin
+  WriteStreamPages(True);
+  WriteOggStream(True);
+end;
+
+procedure TVorbisOggEncoder.WriteStreamPages(aFlush : Boolean);
 var
   og : IOGGPacket;
 begin
@@ -1341,7 +1350,7 @@ begin
     while (Encoder.BitrateFlushPacket(og) <> 0) do
     begin
       OggStream.PacketIn(og);
-      FlushOggStream;
+      WriteOggStream(aFlush);
     end;
   end;
 end;
@@ -1664,12 +1673,12 @@ begin
   end;
 end;
 
-procedure TRefVorbisComment.SetVendor(const S : String);
+procedure TRefVorbisComment.SetVendor(const {%H-}S : String);
 begin
   // not supported for libvorbisenc
 end;
 
-procedure TRefVorbisComment.SetNativeVendor(v : PChar);
+procedure TRefVorbisComment.SetNativeVendor({%H-}v : PChar);
 begin
   // not supported for libvorbisenc
 end;
@@ -1780,20 +1789,20 @@ end;
 
 class function TVorbis.NewOggStreamEncoder(aStream : TStream;
   aDataLimits : TSoundDataLimits;
-  aProps : ISoundEncoderProps; aComments : ISoundComment) : TVorbisOggEncoder;
+  aProps : ISoundEncoderProps; aComments : ISoundComment) : ISoundStreamEncoder;
 begin
-  Result := TVorbisOggStreamingEncoder.Create(aStream, aDataLimits, aProps, aComments);
+  Result := TVorbisOggStreamEncoder.Create(aStream, aDataLimits, aProps, aComments);
 end;
 
 class function TVorbis.NewOggStreamFileDecoder(aStream : TStream;
-    aDataLimits : TSoundDataLimits) : TVorbisOggDecoder;
+    aDataLimits : TSoundDataLimits) : ISoundStreamDecoder;
 begin
-  Result := TVorbisOggStreamingFileDecoder.Create(aStream, aDataLimits);
+  Result := TVorbisOggStreamFileDecoder.Create(aStream, aDataLimits);
 end;
 
-class function TVorbis.NewOggStreamAltDecoder(aStream : TStream) : TVorbisOggDecoder;
+class function TVorbis.NewOggStreamAltDecoder(aStream : TStream) : ISoundStreamDecoder;
 begin
-  Result := TVorbisOggStreamingAltDecoder.Create(aStream);
+  Result := TVorbisOggStreamAltDecoder.Create(aStream);
 end;
 
 class function TVorbis.VorbisLibsLoad(const aVorbisLibs : array of String

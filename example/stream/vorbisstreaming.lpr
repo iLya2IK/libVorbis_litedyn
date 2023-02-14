@@ -54,8 +54,8 @@ const // the name of source vorbis-ogg file
 
 var
   oggf : TVorbisFile; // interface to encode/decode vorbis-Ogg data
-  pack_enc : TVorbisOggEncoder;  // Vorbis custom streaming encoder
-  pack_dec : TVorbisOggDecoder;  // Vorbis custom streaming decoder
+  pack_enc : ISoundStreamEncoder;  // Vorbis custom streaming encoder
+  pack_dec : ISoundStreamDecoder;  // Vorbis custom streaming decoder
   aFileStream : TFileStream;     // TFileStream linked to cStreamFile
   Buffer : Pointer;              // intermediate buffer
   len : ISoundFrameSize;         // length of data
@@ -119,7 +119,7 @@ begin
 
               aFileStream := TFileStream.Create(aFile, fmOpenWrite or fmCreate);
               try
-                TVorbisOggStreamingEncoder(pack_enc).SetStream(aFileStream);
+                pack_enc.SetStream(aFileStream);
                 if (Files.Count = 1) then
                   pack_enc.WriteHeader(nil)
                 else
@@ -127,9 +127,8 @@ begin
                   if cHeaderEveryFrame then
                   begin
                     // alternatively recreate pac_enc here:
-                    // FreeAndNil(pack_enc);
                     // pack_enc := TVorbis.NewOggStreamEncoder(...
-                    TVorbisOggStreamingEncoder(pack_enc).ReInitEncoder;
+                    (pack_enc as TVorbisOggStreamEncoder).ReInitEncoder;
                     pack_enc.WriteHeader(nil);
                   end;
                 end;
@@ -160,7 +159,7 @@ begin
               end;
             end;
           finally
-            pack_enc.Free;
+            pack_enc := nil;
           end;
         finally
           FreeMemAndNil(Buffer);
@@ -186,10 +185,9 @@ begin
               begin
                 if cHeaderEveryFrame then
                 begin
-                   FreeAndNil(pack_dec);
                    pack_dec := TVorbis.NewOggStreamAltDecoder(aFileStream)
                 end else
-                   TVorbisOggStreamingAltDecoder(pack_dec).SetStream(aFileStream);
+                   pack_dec.SetStream(aFileStream);
               end else
                 pack_dec := TVorbis.NewOggStreamAltDecoder(aFileStream);
               try
@@ -209,7 +207,7 @@ begin
             end;
           finally
             FreeMemAndNil(Buffer);
-            if Assigned(pack_dec) then FreeAndNil(pack_dec);
+            if Assigned(pack_dec) then pack_dec := nil;
           end;
           // complete the ogg stream formation process.
           // write the ogg data that is in the cache.
