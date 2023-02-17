@@ -515,6 +515,8 @@ type
                                            aDataLimits : TSoundDataLimits) : ISoundStreamDecoder;
     class function NewOggStreamAltDecoder(aStream : TStream) : ISoundStreamDecoder;
 
+    class function EncoderVersionString : String;
+
     class function VorbisLibsLoad(const aVorbisLibs : Array of String) : Boolean;
     class function VorbisLibsLoadDefault : Boolean;
     class function IsVorbisLibsLoaded : Boolean;
@@ -1803,6 +1805,11 @@ end;
 class function TVorbis.NewOggStreamAltDecoder(aStream : TStream) : ISoundStreamDecoder;
 begin
   Result := TVorbisOggStreamAltDecoder.Create(aStream);
+end;
+
+class function TVorbis.EncoderVersionString : String;
+begin
+  Result := StrPas(PChar(vorbis_version_string()));
 end;
 
 class function TVorbis.VorbisLibsLoad(const aVorbisLibs : array of String
